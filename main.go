@@ -1,8 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/denverquane/reddit-place-2022/pkg"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
@@ -17,36 +17,6 @@ const (
 	addr   = "gql-realtime-2.reddit.com"
 	origin = "https://hot-potato.reddit.com"
 )
-
-type Ack struct {
-	Type string `json:"type"`
-}
-
-type MessageData struct {
-	Payload PayloadData `json:"payload"`
-	ID      string      `json:"id"`
-	Type    string      `json:"type"`
-}
-
-type PayloadData struct {
-	Data SubscribeData `json:"data"`
-}
-
-type SubscribeData struct {
-	Subscribe Data `json:"subscribe"`
-}
-
-type Data struct {
-	ID       string  `json:"id"`
-	Data     RawData `json:"data"`
-	TypeName string  `json:"__typename"`
-}
-
-type RawData struct {
-	TypeName  string  `json:"__typename"`
-	Name      string  `json:"name"`
-	Timestamp float64 `json:"timestamp"`
-}
 
 func main() {
 	var err error
@@ -79,39 +49,8 @@ func main() {
 	done := make(chan struct{})
 	ready := make(chan struct{})
 
-	go func() {
-		defer close(done)
-		for {
-			_, message, err := c.ReadMessage()
-			if err != nil {
-				log.Println("read: ", err)
-				return
-			}
-			var ackMsg Ack
-			err = json.Unmarshal(message, &ackMsg)
-			if err == nil {
-				if ackMsg.Type == "connection_ack" {
-					log.Println("Received connection ack")
-					// send a message saying we're ready to receive data
-					ready <- struct{}{}
-				} else if ackMsg.Type == "data" {
-					var dataMsg MessageData
-					err = json.Unmarshal(message, &dataMsg)
-					if err == nil {
-						rawData := dataMsg.Payload.Data.Subscribe.Data
-						if rawData.TypeName == "FullFrameMessageData" {
-							log.Println("Full Frame Message URL: ", rawData.Name)
-						} else if rawData.TypeName == "DiffFrameMessageData" {
-							log.Println("Diff Frame Message URL: ", rawData.Name)
-						}
-					} else {
-						log.Println(err)
-						log.Printf("recv: %s", message)
-					}
-				}
-			}
-		}
-	}()
+	// start the worker to process messages as we receive them over the websocket
+	go pkg.PlaceWorker(c, ready, done)
 
 	// TODO properly jsonify
 	msg := fmt.Sprintf("{\"type\":\"connection_init\",\"payload\":{\"Authorization\":\"Bearer %s\"}}", token)

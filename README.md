@@ -1,7 +1,8 @@
 # reddit-place-2022
 Testing interaction with Reddit's r/place for 2022
 
-Currently this tool is solely for fetching the image URLs used to render the current state of r/place.
+Currently this tool is solely for downloading the current .png image state of r/place, as well as the image diffs received 
+from Reddit as they come over the websocket
 
 # Help Wanted
 - Automatically fetching the Bearer Token, presumably via logging into Reddit on the user's behalf?
@@ -11,7 +12,11 @@ Currently this tool is solely for fetching the image URLs used to render the cur
 Install Go 1.18, clone this repo, and run `go build main.go` (builds executable) or `go run main.go`
 
 # Usage
-Find your Reddit Bearer Token, and supply it via the `REDDIT_BEARER_TOKEN` environment variable. 
+`go run main.go` or 
+
+`go build main.go` followed by `./main` or `./main.exe`
+
+Find your Reddit Bearer Token, and supply it via the `REDDIT_BEARER_TOKEN` environment variable.
 
 This can be found by searching the Network tab of Google Chrome
 when logged in to https://new.reddit.com/r/place, and searching for "Bearer" like so:
