@@ -11,29 +11,23 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"time"
 )
 
 const (
-	addr   = "gql-realtime-2.reddit.com"
-	origin = "https://hot-potato.reddit.com"
+	baseUrl = "https://new.reddit.com/r/place/"
+	addr    = "gql-realtime-2.reddit.com"
+	origin  = "https://hot-potato.reddit.com"
 )
 
 var GlobalImage image.Image
 var GlobalImageLock sync.RWMutex
 
 func main() {
-	var err error
-	token := os.Getenv("REDDIT_BEARER_TOKEN")
-	if token == "" {
-		log.Fatal("Please supply your REDDIT_BEARER_TOKEN in env")
-	} else {
-		log.Println("Loaded REDDIT_BEARER_TOKEN from env")
-	}
-	if strings.HasPrefix(token, "Bearer ") {
-		token = strings.Replace(token, "Bearer ", "", 1)
+	token, err := pkg.GetRedditAuthToken(baseUrl)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	interrupt := make(chan os.Signal, 1)
