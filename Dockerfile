@@ -14,14 +14,17 @@ COPY ./go.mod ./go.sum ./
 RUN go mod download
 
 # Import the code from the context.
-COPY .github/workflows ./
+COPY ./ ./
 
 # Build the executable to `/app`. Mark the build as statically linked.
 # hadolint ignore=SC2155
-RUN CGO_ENABLED=0 \
+RUN export TAG=$(git describe --tags "$(git rev-list --tags --max-count=1)") && \
+    export COMMIT=$(git rev-parse --short HEAD) && \
+    CGO_ENABLED=0 \
     GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH} \
     go build -installsuffix 'static' \
+    -ldflags="-X main.version=${TAG} -X main.commit=${COMMIT}" \
     -o /app .
 
 FROM alpine:3.12.1 AS final
