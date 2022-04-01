@@ -6,7 +6,19 @@ import (
 	"log"
 )
 
-func PlaceWorker(c *websocket.Conn, ready chan<- struct{}, done chan struct{}) {
+type ImgType int
+
+const (
+	Base ImgType = iota
+	Diff
+)
+
+type DownloadTask struct {
+	ImageType ImgType
+	URL       string
+}
+
+func WebsocketWorker(c *websocket.Conn, ready chan<- struct{}, done chan struct{}, taskQueue chan<- DownloadTask) {
 	defer close(done)
 	for {
 		_, message, err := c.ReadMessage()
@@ -27,20 +39,14 @@ func PlaceWorker(c *websocket.Conn, ready chan<- struct{}, done chan struct{}) {
 				if err == nil {
 					rawData := dataMsg.Payload.Data.Subscribe.Data
 					if rawData.TypeName == "FullFrameMessageData" {
-						err = downloadFile(rawData.Name, "place.png")
-						if err != nil {
-							log.Println(err)
-						} else {
-							log.Println("Successfully downloaded place.png")
+						taskQueue <- DownloadTask{
+							ImageType: Base,
+							URL:       rawData.Name,
 						}
 					} else if rawData.TypeName == "DiffFrameMessageData" {
-						err = downloadFile(rawData.Name, "diff.png")
-						if err != nil {
-							log.Println(err)
-						} else {
-							log.Println("Successfully downloaded diff.png")
-
-							// TODO process diff and combine with place
+						taskQueue <- DownloadTask{
+							ImageType: Diff,
+							URL:       rawData.Name,
 						}
 					}
 				} else {

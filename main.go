@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/denverquane/reddit-place-2022/pkg"
 	"github.com/gorilla/websocket"
+	"image"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,6 +20,9 @@ const (
 	addr   = "gql-realtime-2.reddit.com"
 	origin = "https://hot-potato.reddit.com"
 )
+
+var GlobalImage image.Image
+var GlobalImageLock sync.RWMutex
 
 func main() {
 	var err error
@@ -49,8 +55,48 @@ func main() {
 	done := make(chan struct{})
 	ready := make(chan struct{})
 
+	taskQueue := make(chan pkg.DownloadTask)
 	// start the worker to process messages as we receive them over the websocket
-	go pkg.PlaceWorker(c, ready, done)
+	go pkg.WebsocketWorker(c, ready, done, taskQueue)
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+
+			case task := <-taskQueue:
+				if task.ImageType == pkg.Base {
+					GlobalImageLock.Lock()
+					GlobalImage, err = pkg.DownloadImage(task.URL)
+					GlobalImageLock.Unlock()
+
+					if err != nil {
+						log.Println(err)
+					} else {
+						log.Println("Downloaded base image", task.URL)
+					}
+				} else {
+					startTime := time.Now()
+					diffImage, err := pkg.DownloadImage(task.URL)
+					if err != nil {
+						log.Println(err)
+					} else {
+
+						GlobalImageLock.Lock()
+						GlobalImage, err = pkg.CombineDiffToBase(GlobalImage, diffImage)
+						GlobalImageLock.Unlock()
+
+						if err != nil {
+							log.Println(err)
+						} else {
+							log.Println("Downloaded and combined diff img in", time.Now().Sub(startTime).String())
+						}
+					}
+				}
+			}
+		}
+	}()
 
 	// TODO properly jsonify
 	msg := fmt.Sprintf("{\"type\":\"connection_init\",\"payload\":{\"Authorization\":\"Bearer %s\"}}", token)
@@ -59,6 +105,12 @@ func main() {
 		log.Println("write error: ", err)
 		return
 	}
+
+	srv := &http.Server{Addr: ":8080"}
+	http.HandleFunc("/", pkg.HandleRequestWrapper(&GlobalImage, &GlobalImageLock))
+	go func() {
+		srv.ListenAndServe()
+	}()
 
 	for {
 		select {
@@ -86,6 +138,7 @@ func main() {
 			case <-done:
 			case <-time.After(time.Second):
 			}
+			srv.Shutdown(context.TODO())
 			return
 		}
 	}
