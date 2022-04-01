@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/denverquane/reddit-place-2022/pkg"
-	"github.com/gorilla/websocket"
 	"image"
 	"log"
 	"net/http"
@@ -13,6 +11,9 @@ import (
 	"os/signal"
 	"sync"
 	"time"
+
+	"github.com/denverquane/reddit-place-2022/pkg"
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -21,8 +22,13 @@ const (
 	origin  = "https://hot-potato.reddit.com"
 )
 
-var GlobalImage image.Image
-var GlobalImageLock sync.RWMutex
+var (
+	GlobalImage     image.Image
+	GlobalImageLock sync.RWMutex
+)
+
+func init() {
+}
 
 func main() {
 	token, err := pkg.GetRedditAuthToken(baseUrl)
