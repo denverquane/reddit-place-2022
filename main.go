@@ -26,7 +26,9 @@ var GlobalImage image.Image
 var GlobalImageLock sync.RWMutex
 
 func main() {
-	token, err := pkg.GetRedditAuthToken(baseUrl)
+	// TODO this token will eventually expire, and the websocket will be closed. It should be re-opened automatically
+	// using the expiration info provided as part of the GetRedditAuthToken function below
+	token, _, _, err := pkg.GetRedditAuthToken(baseUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
