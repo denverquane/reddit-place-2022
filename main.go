@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"image"
 	"log"
 	"net/http"
@@ -27,11 +27,10 @@ var (
 	GlobalImageLock sync.RWMutex
 )
 
-func init() {
-}
-
 func main() {
-	token, err := pkg.GetRedditAuthToken(baseUrl)
+	// TODO this token will eventually expire, and the websocket will be closed. It should be re-opened automatically
+	// using the expiration info provided as part of the GetRedditAuthToken function below
+	token, _, _, err := pkg.GetRedditAuthToken(baseUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -98,8 +97,17 @@ func main() {
 		}
 	}()
 
-	// TODO properly jsonify
-	msg := fmt.Sprintf("{\"type\":\"connection_init\",\"payload\":{\"Authorization\":\"Bearer %s\"}}", token)
+	msg, err := json.Marshal(ConnectionInitMessage{
+		Type: "connection_init",
+		Payload: ConnectionInitMessagePayload{
+			Authorization: "Bearer " + token,
+		},
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = c.WriteMessage(websocket.TextMessage, []byte(msg))
 	if err != nil {
 		log.Println("write error: ", err)
@@ -118,11 +126,56 @@ func main() {
 			return
 
 		case <-ready:
-			// TODO obv this shouldn't be an explicit string, should be a struct that gets jsonified
-			err = c.WriteMessage(websocket.TextMessage, []byte("{\"id\":\"2\",\"type\":\"start\",\"payload\":{\"variables\":{\"input\":{\"channel\":{\"teamOwner\":\"AFD2022\",\"category\":\"CANVAS\",\"tag\":\"0\"}}},\"extensions\":{},\"operationName\":\"replace\",\"query\":\"subscription replace($input: SubscribeInput!) {\\n  subscribe(input: $input) {\\n    id\\n    ... on BasicMessage {\\n      data {\\n        __typename\\n        ... on FullFrameMessageData {\\n          __typename\\n          name\\n          timestamp\\n        }\\n        ... on DiffFrameMessageData {\\n          __typename\\n          name\\n          currentTimestamp\\n          previousTimestamp\\n        }\\n      }\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\"}}{\"type\":\"ka\"}"))
+			msg, err := json.Marshal(StartMessage{
+				ID:   "1",
+				Type: "start",
+				Payload: StartMessagePayload{
+					Extensions:    struct{}{},
+					OperationName: "replace",
+					Query: `subscription replace($input: SubscribeInput!) {
+	subscribe(input: $input) {
+		id
+		... on BasicMessage {
+			data {
+				__typename
+				... on FullFrameMessageData {
+					__typename
+					name
+					timestamp
+				}
+				... on DiffFrameMessageData {
+					__typename
+					name
+					currentTimestamp
+					previousTimestamp
+				}
+			}
+			__typename
+		}
+		__typename
+	}
+}`,
+					Variables: StartMessagePayloadVariables{
+						Input: StartMessagePayloadVariablesInput{
+							Channel: StartMessagePayloadVariablesInputChannel{
+								TeamOwner: "AFD2022",
+								Category:  "CANVAS",
+								Tag:       "0",
+							},
+						},
+					},
+				},
+			})
+
 			if err != nil {
 				log.Println(err)
 			}
+
+			err = c.WriteMessage(websocket.TextMessage, msg)
+			if err != nil {
+				log.Println(err)
+			}
+
 			log.Println("Sent Ready message to Reddit")
 		case <-interrupt:
 			log.Println("interrupt")
