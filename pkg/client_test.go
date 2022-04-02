@@ -6,9 +6,11 @@ import (
 )
 
 func TestGetRedditAuthToken(t *testing.T) {
-	token, err := GetRedditAuthToken("https://new.reddit.com/r/place/")
+	token, expireTime, expiresIn, err := GetRedditAuthToken("https://new.reddit.com/r/place/")
 	if err != nil {
 		t.Fatal(err)
 	}
 	log.Println(token)
+	log.Println("Expires: ", expireTime)
+	log.Println("Expires in: ", expiresIn, "seconds")
 }
