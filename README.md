@@ -14,6 +14,12 @@ not the anonymous Bearer token login that is currently in place
 # Installation
 Install Go 1.18, clone this repo, and run `go build main.go` (builds executable) or `go run main.go`
 
+Create a `.env` file with the following values, which can be created here: https://www.reddit.com/prefs/apps
+```bash
+REDDIT_CLIENT_ID=
+REDDIT_CLIENT_SECRET=
+```
+
 # Usage
 `go run main.go` or 
 

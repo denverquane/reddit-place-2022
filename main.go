@@ -22,8 +22,10 @@ const (
 	origin  = "https://hot-potato.reddit.com"
 )
 
-var GlobalImage image.Image
-var GlobalImageLock sync.RWMutex
+var (
+	GlobalImage     image.Image
+	GlobalImageLock sync.RWMutex
+)
 
 func main() {
 	// TODO this token will eventually expire, and the websocket will be closed. It should be re-opened automatically
