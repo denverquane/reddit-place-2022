@@ -19,6 +19,34 @@ func TestParseTime(t *testing.T) {
 	if ti.UnixMilli() != RedditExampleTimeUnixMilli {
 		t.Error()
 	}
+
+	// test the variadic number of digits after the decimal
+	i = "2022-04-03 17:38:22.25 UTC"
+	ti, err = ParseTime(i)
+	if err != nil {
+		t.Error(err)
+	}
+	if ti.UnixMilli() != RedditExampleTimeUnixMilli-2 {
+		t.Error()
+	}
+
+	i = "2022-04-03 17:38:22.2 UTC"
+	ti, err = ParseTime(i)
+	if err != nil {
+		t.Error(err)
+	}
+	if ti.UnixMilli() != RedditExampleTimeUnixMilli-52 {
+		t.Error()
+	}
+
+	i = "2022-04-03 17:38:22 UTC"
+	ti, err = ParseTime(i)
+	if err != nil {
+		t.Error(err)
+	}
+	if ti.UnixMilli() != RedditExampleTimeUnixMilli-252 {
+		t.Error()
+	}
 }
 
 func TestToRecord(t *testing.T) {
