@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func ParseAndAdd(filename string, worker storage.PostgresWorker) error {
+func ParseAndAdd(filename string, worker *storage.PostgresWorker) error {
 	f, err := os.Open(filename)
 	if err != nil {
 		log.Fatal(err)

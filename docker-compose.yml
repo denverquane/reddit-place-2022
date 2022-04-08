@@ -1,0 +1,23 @@
+version: "3.9"
+services:
+  reddit-place-2022:
+    image: "denverquane/reddit-place-2022:main"
+    environment:
+      POSTGRES_URL: db:5432
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASS: "mysecretpassword"
+    volumes:
+      - place-data:/app/data
+    depends_on:
+      - db
+
+  db:
+    image: "postgres" # todo tag an official version
+    environment:
+      POSTGRES_PASSWORD: "mysecretpassword"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:
+  place-data:

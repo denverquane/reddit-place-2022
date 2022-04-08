@@ -34,12 +34,14 @@ FROM alpine:3.12.1 AS final
 # * App directory to allow mounting volumes
 RUN addgroup -g 1000 app && \
     adduser -HD -u 1000 -G app app && \
-    mkdir -p /app/logs && \
+    mkdir -p /app/data && \
+    mkdir -p /app/internal && \
     chown -R app:app /app
 USER app
 
 # Import the compiled executable from the first stage.
 COPY --from=builder /app /app
+COPY --from=builder /app/internal/postgres.sql /app/internal/postgres.sql
 
 # Run the compiled binary.
 ENTRYPOINT ["/app/app"]

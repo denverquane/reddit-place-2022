@@ -7,8 +7,8 @@ import (
 	"os"
 )
 
-func MakeImage(pixels []*PixelEdit) {
-	img := image.NewRGBA(image.Rect(0, 0, 2000, 2000))
+func MakeImage(filename string, size image.Rectangle, pixels []*PixelEdit) {
+	img := image.NewRGBA(size)
 
 	for _, r := range pixels {
 		c, err := ParseHexColor(r.HexColor)
@@ -17,8 +17,6 @@ func MakeImage(pixels []*PixelEdit) {
 		}
 		img.Set(int(r.X), int(r.Y), c)
 	}
-	filename := "place.png"
-	log.Println("Writing to", filename)
 	f, err := os.Create(filename)
 	if err != nil {
 		log.Println(err)
@@ -28,5 +26,4 @@ func MakeImage(pixels []*PixelEdit) {
 		log.Println(err)
 	}
 	f.Close()
-	log.Println("Finished writing img data")
 }
