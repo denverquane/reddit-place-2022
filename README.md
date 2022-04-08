@@ -1,30 +1,20 @@
 # reddit-place-2022
-Testing interaction with Reddit's r/place for 2022
+A Go download and processing tool for Reddit's 2022 r/place April Fools data.
 
-Currently this tool is solely for processing/proxying the current PNG canvas of reddit/r/place in purely a read-only fashion.
-
-# Help Wanted
-- Submitting or engaging with the Websocket/place in a more substantive way, such as for marking pixels automatically
-
-Here is the main .js file used to reconstruct the GraphQL query that subscribes for incoming canvas data:
-https://www.redditstatic.com/mona-lisa/en-US/index-3cc1ba23.js
-Search for "setPixel" to see info for how to mark a pixel, but note, this will require a valid Reddit login,
-not the anonymous Bearer token login that is currently in place
+https://www.reddit.com/r/place/comments/txvk2d/rplace_datasets_april_fools_2022/
 
 # Installation
-Install Go 1.18, clone this repo, and run `go build main.go` (builds executable) or `go run main.go`
-
-Create a `.env` file with the following values, which can be created here: https://www.reddit.com/prefs/apps
-```bash
-REDDIT_CLIENT_ID=
-REDDIT_CLIENT_SECRET=
-```
+1. [Install Go 1.18](https://go.dev/dl/)
+2. Clone this repo: `git clone https://github.com/denverquane/reddit-place-2022`
+3. Build or run the code: `go build main.go` (builds executable) or `go run main.go`
 
 # Usage
 `go run main.go` or 
 
 `go build main.go` followed by `./main` or `./main.exe`
 
-There is also a Docker image provided at `denverquane/reddit-place-2022`
+Downloads and unpacks all csv files into the current directory (TODO: config download dir)
 
-You can then visit `localhost:8080` to view the current place image
+At the time of writing, this utility simply downloads and unpacks all the data files needed for further processing.
+The data files have considerable overlap in timestamps, so using an external DB or storage mechanism is probably the
+best course of action, as opposed to manually sorting all the events
