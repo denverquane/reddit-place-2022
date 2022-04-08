@@ -3,6 +3,9 @@ services:
   reddit-place-2022:
     image: "denverquane/reddit-place-2022:main"
     environment:
+      ONLY_DRAW:
+      PLACE_DATA_DIR: /app/data
+      POSTGRES_SCHEMA_DIR: /app
       POSTGRES_URL: db:5432
       POSTGRES_USER: "postgres"
       POSTGRES_PASS: "mysecretpassword"

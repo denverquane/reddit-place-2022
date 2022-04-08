@@ -12,36 +12,42 @@ import (
 	"time"
 )
 
-const (
-	OnlyDraw = false
-)
-
 func main() {
 	worker := storage.PostgresWorker{}
-	err := worker.Init("internal/postgres.sql", os.Getenv("POSTGRES_URL"), os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASS"))
+	// TODO can't end in /, fix and use proper paths
+	postgresSchemaDir := "internal"
+	if os.Getenv("POSTGRES_SCHEMA_DIR") != "" {
+		postgresSchemaDir = os.Getenv("POSTGRES_SCHEMA_DIR")
+	}
+	// TODO can't end in /, fix and use proper paths
+	dataDir := "data"
+	if os.Getenv("PLACE_DATA_DIR") != "" {
+		dataDir = os.Getenv("PLACE_DATA_DIR")
+	}
+	err := worker.Init(postgresSchemaDir+"/postgres.sql", os.Getenv("POSTGRES_URL"), os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASS"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// TODO configure download vs postgres vs image generation
-	if !OnlyDraw {
+	if os.Getenv("ONLY_DRAW") == "" {
 		filenames := file.GenerateFileNames()
 		fileQueue := make(chan string, len(filenames))
 
 		//one background task for downloading files (probably won't benefit from parallelism)
 		go func() {
 			for _, name := range filenames {
-				if !file.DirectoryContains("data", name+".csv") && !file.DirectoryContains("data", name+".csv.complete") {
-					log.Printf("Missing data/%s.csv, downloading now\n", name)
-					err := file.DownloadGzip("data/"+name+".csv", file.DataBaseURL+name+".csv.gzip")
+				if !file.DirectoryContains(dataDir, name+".csv") && !file.DirectoryContains(dataDir, name+".csv.complete") {
+					log.Printf("Missing %s/%s.csv, downloading now\n", dataDir, name)
+					err := file.DownloadGzip(dataDir+"/"+name+".csv", file.DataBaseURL+name+".csv.gzip")
 					if err != nil {
 						log.Println(err)
 						continue
 					}
 				}
 				// regardless of if we download or not, only enqueue files that aren't marked as complete
-				if !file.DirectoryContains("data", name+".csv.complete") {
-					fileQueue <- "data/" + name + ".csv"
+				if !file.DirectoryContains(dataDir, name+".csv.complete") {
+					fileQueue <- dataDir + "/" + name + ".csv"
 				}
 			}
 			log.Println("Download worker is done")

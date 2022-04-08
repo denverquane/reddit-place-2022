@@ -35,13 +35,12 @@ FROM alpine:3.12.1 AS final
 RUN addgroup -g 1000 app && \
     adduser -HD -u 1000 -G app app && \
     mkdir -p /app/data && \
-    mkdir -p /app/internal && \
     chown -R app:app /app
 USER app
 
 # Import the compiled executable from the first stage.
 COPY --from=builder /app /app
-COPY --from=builder /src/internal/postgres.sql /app/internal/postgres.sql
+COPY --from=builder /src/internal/postgres.sql /app/postgres.sql
 
 # Run the compiled binary.
 ENTRYPOINT ["/app/app"]
