@@ -4,26 +4,27 @@ import (
 	"context"
 	"fmt"
 	"github.com/denverquane/reddit-place-2022/pkg/reddit"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/georgysavva/scany/pgxscan"
+	"github.com/jackc/pgx/v4"
 	"io/ioutil"
 	"log"
 	"os"
 )
 
 type PostgresWorker struct {
-	pool *pgxpool.Pool
+	Conn *pgx.Conn
 }
 
 func (w *PostgresWorker) Init(filepath, url, user, pass string) error {
 	log.Println("Connecting to Postgres at", url)
 	connString := fmt.Sprintf("postgres://%s?user=%s&password=%s", url, user, pass)
-	dbpool, err := pgxpool.Connect(context.Background(), connString)
+	conn, err := pgx.Connect(context.Background(), connString)
 	if err != nil {
 		return err
 	} else {
 		log.Println("Connection successful")
 	}
-	w.pool = dbpool
+	w.Conn = conn
 
 	f, err := os.Open(filepath)
 	if err != nil {
@@ -35,7 +36,7 @@ func (w *PostgresWorker) Init(filepath, url, user, pass string) error {
 	if err != nil {
 		return err
 	}
-	tag, err := w.pool.Exec(context.Background(), string(bytes))
+	tag, err := w.Conn.Exec(context.Background(), string(bytes))
 	if err != nil {
 		return err
 	}
@@ -43,25 +44,18 @@ func (w *PostgresWorker) Init(filepath, url, user, pass string) error {
 	return nil
 }
 
-func (w *PostgresWorker) Add(record reddit.Record) error {
-	if w.pool == nil {
-		return noInitError
+func (w *PostgresWorker) Close() error {
+	if w.Conn != nil {
+		return w.Conn.Close(context.Background())
 	}
-	_, err := w.pool.Exec(context.Background(), "INSERT INTO events VALUES ($1, $2, $3, $4, $5);", record.Time, record.UserID, record.Color, record.Pixel.X, record.Pixel.Y)
-	return err
+	return nil
 }
 
-func (w *PostgresWorker) Start(tasks <-chan reddit.Record) error {
-	if w.pool == nil {
-		return noInitError
+func (w *PostgresWorker) GetLastEditForEveryPixel() ([]*reddit.PixelEdit, error) {
+	var pixels []*reddit.PixelEdit
+	err := pgxscan.Select(context.Background(), w.Conn, &pixels, "select pixel_color, x, y from (select distinct on (x, y) timestamp, pixel_color, x, y from events) as event order by timestamp desc;")
+	if err != nil {
+		return pixels, err
 	}
-
-	for record := range tasks {
-		err := w.Add(record)
-		if err != nil {
-			log.Println(err)
-		}
-	}
-
-	return nil
+	return pixels, nil
 }

@@ -1,41 +1,70 @@
 package file
 
 import (
-	"encoding/csv"
-	"github.com/denverquane/reddit-place-2022/pkg/reddit"
-	"io"
+	"bufio"
+	"context"
+	"github.com/denverquane/reddit-place-2022/pkg/storage"
 	"log"
 	"os"
+	"strings"
 )
 
-func Parse(filename string, workQueue chan<- reddit.Record) {
-	log.Println("Parsing", filename)
+func ParseAndAdd(filename string, worker storage.PostgresWorker) error {
 	f, err := os.Open(filename)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer f.Close()
 
-	r := csv.NewReader(f)
-	// skip the header
-	r.Read()
-	for {
-		tokens, err := r.Read()
-		if err == io.EOF {
-			break
-		}
+	newFile, err := os.Create(filename + "_tmp")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sc := bufio.NewScanner(f)
+	writer := bufio.NewWriter(newFile)
+	if sc.Scan() {
+		// header
+		_, err := writer.WriteString("timestamp,user_id,pixel_color,x,y,x1,y1\n")
 		if err != nil {
-			log.Println(err)
-			continue
-		}
-		recs, err := reddit.ToRecords(tokens)
-		if err != nil {
-			log.Println(err)
-		} else {
-			for _, rec := range recs {
-				workQueue <- rec
-			}
+			log.Fatal(err)
 		}
 	}
-	log.Println(filename, "complete")
+	for sc.Scan() {
+		line := strings.ReplaceAll(sc.Text(), "\"", "")
+		if strings.Count(line, ",") == 4 {
+			line += ",,"
+		}
+		_, err = writer.WriteString(line + "\n")
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	err = writer.Flush()
+	if err != nil {
+		log.Fatal(err)
+	}
+	newFile.Close()
+	newFile, err = os.Open(filename + "_tmp")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// use a temp table to prevent errors when adding duplicate primary keys (thanks Reddit)
+	_, err = worker.Conn.PgConn().CopyFrom(context.Background(), newFile, "COPY tmp_table FROM STDIN CSV HEADER")
+	if err != nil {
+		newFile.Close()
+		return err
+	}
+	r := worker.Conn.PgConn().Exec(context.Background(), "INSERT INTO events SELECT * FROM tmp_table ON CONFLICT DO NOTHING")
+	res, err := r.ReadAll()
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Println(res)
+	}
+
+	newFile.Close()
+	return os.Remove(filename + "_tmp")
 }

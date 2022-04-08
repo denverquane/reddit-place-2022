@@ -46,9 +46,9 @@ func DownloadGzip(filepath string, url string) (err error) {
 	}
 	defer resp.Body.Close()
 
-	// Check that the server actually sent compressed data
 	var reader io.ReadCloser
 	reader, err = gzip.NewReader(resp.Body)
+	defer reader.Close()
 
 	_, err = io.Copy(out, reader)
 	if err != nil {
