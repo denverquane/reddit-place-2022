@@ -20,10 +20,10 @@ func main() {
 	filenames := file.GenerateFileNames()
 	fileQueue := make(chan string, len(filenames))
 
-	// one background task for downloading files (probably won't benefit from parallelism)
+	//one background task for downloading files (probably won't benefit from parallelism)
 	go func() {
 		for _, name := range filenames {
-			if !file.DirectoryContains("data", name+".csv") {
+			if !file.DirectoryContains("data", name+".csv") && !file.DirectoryContains("data", name+".csv.complete") {
 				log.Printf("Missing data/%s.csv, downloading now\n", name)
 				err := file.DownloadGzip("data/"+name+".csv", file.DataBaseURL+name+".csv.gzip")
 				if err != nil {
@@ -31,7 +31,10 @@ func main() {
 					continue
 				}
 			}
-			fileQueue <- "data/" + name + ".csv"
+			// regardless of if we download or not, only enqueue files that aren't marked as complete
+			if !file.DirectoryContains("data", name+".csv.complete") {
+				fileQueue <- "data/" + name + ".csv"
+			}
 		}
 		log.Println("Download worker is done")
 		close(fileQueue)
@@ -49,6 +52,8 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
+	worker.Close()
+
 	// TODO more gracefully determine what files were completely processed
 }
 
@@ -63,6 +68,11 @@ func fileWorker(fileQueue <-chan string, worker storage.PostgresWorker) {
 		if err != nil {
 			log.Println(err)
 		}
+		f, err := os.Create(name + ".complete")
+		if err != nil {
+			log.Println(err)
+		}
+		f.Close()
 		log.Printf("Worker finished %s\n", name)
 	}
 	log.Printf("File worker is done\n")
