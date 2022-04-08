@@ -2,7 +2,6 @@ package reddit
 
 import (
 	"image"
-	"image/color"
 	"strconv"
 	"strings"
 	"time"
@@ -10,53 +9,59 @@ import (
 
 type Record struct {
 	Time   time.Time
-	userID string
-	color  color.RGBA
-	rect   image.Rectangle
+	UserID string
+	Color  string
+	Pixel  image.Point
 }
 
-func ToRecord(line []string) (Record, error) {
+func ToRecords(line []string) ([]Record, error) {
 	t, err := ParseTime(line[0])
 	if err != nil {
-		return Record{}, err
+		return nil, err
 	}
+
 	coords := strings.Split(line[3], ",")
+	x1, err := strconv.ParseInt(coords[0], 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	y1, err := strconv.ParseInt(coords[1], 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	if len(coords) == 2 {
+		return []Record{
+			{
+				Time:   t,
+				UserID: line[1],
+				Color:  line[2],
+				Pixel:  image.Point{X: int(x1), Y: int(y1)},
+			},
+		}, nil
+	}
+	x2, err := strconv.ParseInt(coords[2], 10, 16)
+	if err != nil {
+		return nil, err
+	}
+	y2, err := strconv.ParseInt(coords[3], 10, 16)
+	if err != nil {
+		return nil, err
+	}
 
-	x, err := strconv.ParseUint(coords[0], 10, 64)
-	if err != nil {
-		return Record{}, err
+	records := make([]Record, (x2-x1)*(y2-y1))
+	i := 0
+	for x := x1; x < x2; x++ {
+		for y := y1; y < y2; y++ {
+			records[i] = Record{
+				Time:   t,
+				UserID: line[1],
+				Color:  line[2],
+				Pixel:  image.Point{X: int(x), Y: int(y)},
+			}
+		}
 	}
-	y, err := strconv.ParseUint(coords[1], 10, 64)
-	if err != nil {
-		return Record{}, err
-	}
-	rect := image.Rect(int(x), int(y), int(x), int(y))
 
-	// exceptional overwrite case for moderator actions
-	if len(coords) == 4 {
-		x1, err := strconv.ParseInt(coords[2], 10, 16)
-		if err != nil {
-			return Record{}, err
-		}
-		y1, err := strconv.ParseInt(coords[3], 10, 16)
-		if err != nil {
-			return Record{}, err
-		}
-		rect.Max = image.Point{
-			X: int(x1),
-			Y: int(y1),
-		}
-	}
-	c, err := ParseHexColor(line[2])
-	if err != nil {
-		return Record{}, err
-	}
-	return Record{
-		Time:   t,
-		userID: line[1],
-		color:  c,
-		rect:   rect,
-	}, nil
+	return records, nil
 }
 
 func ParseTime(input string) (time.Time, error) {

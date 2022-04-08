@@ -41,7 +41,5 @@ USER app
 # Import the compiled executable from the first stage.
 COPY --from=builder /app /app
 
-EXPOSE 8080
-
 # Run the compiled binary.
 ENTRYPOINT ["/app/app"]

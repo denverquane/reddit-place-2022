@@ -56,14 +56,14 @@ func TestToRecord(t *testing.T) {
 		"#FF3881",
 		"0,0",
 	}
-	r, err := ToRecord(line)
+	r, err := ToRecords(line)
 	if err != nil {
 		t.Error(err)
 	}
-	if r.Time.UnixMilli() != RedditExampleTimeUnixMilli {
+	if r[0].Time.UnixMilli() != RedditExampleTimeUnixMilli {
 		t.Error("Time not parsed correctly")
 	}
-	if r.userID != "yTrYCd4LUpBn4rIyNXkkW2+Fac5cQHK2lsDpNghkq0oPu9o//8oPZPlLM4CXQeEIId7l011MbHcAaLyqfhSRoA==" {
+	if r[0].UserID != "yTrYCd4LUpBn4rIyNXkkW2+Fac5cQHK2lsDpNghkq0oPu9o//8oPZPlLM4CXQeEIId7l011MbHcAaLyqfhSRoA==" {
 		t.Error("UserID not parsed correctly")
 	}
 	p := color.RGBA{
@@ -72,19 +72,19 @@ func TestToRecord(t *testing.T) {
 		B: 129,
 		A: 255,
 	}
-	if r.color != p {
+	if r[0].Color != p {
 		t.Error("Color not parsed correctly")
 	}
-	if r.rect != image.Rect(0, 0, 0, 0) {
+	if r[0].Pixel != image.Pt(0, 0) {
 		t.Error("Rect not parsed correctly")
 	}
 
 	line[3] = "1,2,3,4"
-	r, err = ToRecord(line)
+	r, err = ToRecords(line)
 	if err != nil {
 		t.Error(err)
 	}
-	if r.rect != image.Rect(1, 2, 3, 4) {
-		t.Error("Moderator rect not parsed correctly")
+	if len(r) != 4 {
+		t.Error("Did not generate 4 expected pixels from a moderator square")
 	}
 }

@@ -18,7 +18,11 @@ func ProcessWorker(dataQueue <-chan Record, totalLines float64) {
 	var line float64
 	var percentThreshold = PercentSnapshot
 	for r := range dataQueue {
-		img.Set(r.rect.Min.X, r.rect.Min.Y, r.color)
+		c, err := ParseHexColor(r.Color)
+		if err != nil {
+			log.Println(err)
+		}
+		img.Set(r.Pixel.X, r.Pixel.Y, c)
 		line++
 		if line/totalLines*100.0 > percentThreshold {
 			filename := fmt.Sprintf("images/place_%d.png", int(percentThreshold))

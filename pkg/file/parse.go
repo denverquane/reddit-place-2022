@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-func Parse(filename string) {
+func Parse(filename string, workQueue chan<- reddit.Record) {
 	log.Println("Parsing", filename)
 	f, err := os.Open(filename)
 	if err != nil {
@@ -28,11 +28,14 @@ func Parse(filename string) {
 			log.Println(err)
 			continue
 		}
-		_, err = reddit.ToRecord(tokens)
+		recs, err := reddit.ToRecords(tokens)
 		if err != nil {
 			log.Println(err)
+		} else {
+			for _, rec := range recs {
+				workQueue <- rec
+			}
 		}
-
-		// TODO dump to db or other processing entity here
 	}
+	log.Println(filename, "complete")
 }
