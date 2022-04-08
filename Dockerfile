@@ -41,7 +41,7 @@ USER app
 
 # Import the compiled executable from the first stage.
 COPY --from=builder /app /app
-COPY --from=builder /app/internal/postgres.sql /app/internal/postgres.sql
+COPY --from=builder /src/internal/postgres.sql /app/internal/postgres.sql
 
 # Run the compiled binary.
 ENTRYPOINT ["/app/app"]
