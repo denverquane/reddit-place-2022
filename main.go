@@ -1,103 +1,87 @@
 package main
 
 import (
+	"fmt"
 	"github.com/denverquane/reddit-place-2022/pkg/file"
 	"github.com/denverquane/reddit-place-2022/pkg/reddit"
-	"github.com/denverquane/reddit-place-2022/pkg/storage"
+	"github.com/xitongsys/parquet-go-source/local"
+	"github.com/xitongsys/parquet-go/reader"
 	"image"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 )
 
+const (
+	ParquetFileName  = "2022_place_deephaven.parquet"
+	ParquetBaseURL   = "https://deephaven.io/wp-content/"
+	RowBufferSize    = 10000
+	DrawPreModImages = true
+	// set to 0 to disable
+	DrawEveryVarPercent = 5
+)
+
 func main() {
-	worker := storage.PostgresWorker{}
-	// TODO can't end in /, fix and use proper paths
-	postgresSchemaDir := "internal"
-	if os.Getenv("POSTGRES_SCHEMA_DIR") != "" {
-		postgresSchemaDir = os.Getenv("POSTGRES_SCHEMA_DIR")
-	}
 	// TODO can't end in /, fix and use proper paths
 	dataDir := "data"
 	if os.Getenv("PLACE_DATA_DIR") != "" {
 		dataDir = os.Getenv("PLACE_DATA_DIR")
 	}
-	err := worker.Init(postgresSchemaDir+"/postgres.sql", os.Getenv("POSTGRES_URL"), os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASS"))
+	if !file.DirectoryContains(dataDir, ParquetFileName) {
+		log.Println("Looks like you're missing", dataDir+"/"+ParquetFileName)
+		err := file.DownloadFile(ParquetBaseURL+ParquetFileName, dataDir+"/"+ParquetFileName)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	fr, err := local.NewLocalFileReader(dataDir + "/" + ParquetFileName)
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Can't open file")
+		return
+	}
+	pr, err := reader.NewParquetReader(fr, new(reddit.Edit), 4)
+	if err != nil {
+		log.Println("Can't create parquet reader", err)
+		return
 	}
 
-	// TODO configure download vs postgres vs image generation
-	if os.Getenv("ONLY_DRAW") == "" {
-		filenames := file.GenerateFileNames()
-		fileQueue := make(chan string, len(filenames))
-
-		//one background task for downloading files (probably won't benefit from parallelism)
-		go func() {
-			for _, name := range filenames {
-				if !file.DirectoryContains(dataDir, name+".csv") && !file.DirectoryContains(dataDir, name+".csv.complete") {
-					log.Printf("Missing %s/%s.csv, downloading now\n", dataDir, name)
-					err := file.DownloadGzip(dataDir+"/"+name+".csv", file.DataBaseURL+name+".csv.gzip")
-					if err != nil {
-						log.Println(err)
-						continue
-					}
-				}
-				// regardless of if we download or not, only enqueue files that aren't marked as complete
-				if !file.DirectoryContains(dataDir, name+".csv.complete") {
-					fileQueue <- dataDir + "/" + name + ".csv"
-				}
-			}
-			log.Println("Download worker is done")
-			close(fileQueue)
-		}()
-
-		go fileWorker(fileQueue, &worker)
-
-		sc := make(chan os.Signal, 1)
-		signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-		<-sc
-	} else {
-		drawImage(&worker)
-	}
-
-	worker.Close()
-}
-
-func drawImage(worker *storage.PostgresWorker) {
+	img := image.NewRGBA(image.Rect(0, 0, 2000, 2000))
+	var row int64 = 0
+	totalRows := pr.GetNumRows()
+	percentThreshold := DrawEveryVarPercent
 	start := time.Now()
-	px, err := worker.GetPixelsUpToTimeInRegion(
-		time.Date(2022, time.April, 3, 0, 0, 0, 0, time.UTC),
-		image.Rect(0, 0, 500, 500))
+	for row < totalRows {
+		pixels := make([]reddit.Edit, RowBufferSize)
+		if err = pr.Read(&pixels); err != nil {
+			log.Println("Read error", err)
+		}
+		for _, r := range pixels {
+			if DrawPreModImages && r.IsMod() {
+				err := reddit.DrawSubregionToFile(img, image.Rect(int(r.X1), int(r.Y1), int(r.X2), int(r.Y2)),
+					fmt.Sprintf("images/place_mod_[%d,%d]-[%d,%d].png", r.X1, r.Y1, r.Y1, r.Y2))
+				if err != nil {
+					log.Println(err)
+				}
+			} else if r.X1 < 0 || r.Y1 < 0 || r.X1 > 2000 || r.Y1 > 2000 {
+				// TODO determine these pixels' existence. Looks like an unmarshalling error from Parquet(?)
+			}
+			img.Set(int(r.X1), int(r.Y1), r.GetColor())
+			row++
+			if percentThreshold > 0 && (float64(row)/float64(totalRows)*100.0) > float64(percentThreshold) {
+				err := reddit.DrawToFile(img, fmt.Sprintf("images/place_%d.png", percentThreshold))
+				if err != nil {
+					log.Println(err)
+				}
+				percentThreshold += DrawEveryVarPercent
+			}
+		}
+	}
+	log.Println("Took", time.Since(start), "to generate final image")
+	err = reddit.DrawToFile(img, "images/place.png")
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
-	log.Println("Took", time.Since(start), "to fetch data from Postgres")
-	start = time.Now()
-	// TODO the pixels drawn might be offset if we requested an offset region from Postgres
-	reddit.MakeImage("place.png", image.Rect(0, 0, 500, 500), px)
-	log.Println("Took", time.Since(start), "to draw place.png")
-}
-
-func fileWorker(fileQueue <-chan string, worker *storage.PostgresWorker) {
-	for name := range fileQueue {
-		log.Printf("Worker picked up %s\n", name)
-		err := file.ParseAndAdd(name, worker)
-		if err != nil {
-			log.Println(err)
-		}
-		err = os.Remove(name)
-		if err != nil {
-			log.Println(err)
-		}
-		f, err := os.Create(name + ".complete")
-		if err != nil {
-			log.Println(err)
-		}
-		f.Close()
-		log.Printf("Worker finished %s\n", name)
-	}
-	log.Printf("File worker is done\n")
+	pr.ReadStop()
+	fr.Close()
 }

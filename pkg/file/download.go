@@ -1,8 +1,6 @@
 package file
 
 import (
-	"compress/gzip"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -10,25 +8,7 @@ import (
 	"time"
 )
 
-const (
-	TotalFiles   = 79
-	DataBaseURL  = "https://placedata.reddit.com/data/canvas-history/"
-	DataFileBase = "2022_place_canvas_history-0000000000" // removed two 0s
-)
-
-func GenerateFileNames() [TotalFiles]string {
-	var arr [TotalFiles]string
-	for i := 0; i < TotalFiles; i++ {
-		if i < 10 {
-			arr[i] = fmt.Sprintf("%s0%d", DataFileBase, i)
-		} else {
-			arr[i] = fmt.Sprintf("%s%d", DataFileBase, i)
-		}
-	}
-	return arr
-}
-
-func DownloadGzip(filepath string, url string) (err error) {
+func DownloadFile(url, filepath string) (err error) {
 	// Create the file
 	out, err := os.Create(filepath)
 	if err != nil {
@@ -36,21 +16,15 @@ func DownloadGzip(filepath string, url string) (err error) {
 	}
 	defer out.Close()
 
+	log.Println("Downloading", url, "to", filepath)
 	start := time.Now()
-
-	client := new(http.Client)
-	request, err := http.NewRequest("GET", url, nil)
-	resp, err := client.Do(request)
+	resp, err := http.Get(url)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	var reader io.ReadCloser
-	reader, err = gzip.NewReader(resp.Body)
-	defer reader.Close()
-
-	_, err = io.Copy(out, reader)
+	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		return err
 	}

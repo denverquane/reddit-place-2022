@@ -7,23 +7,28 @@ import (
 	"os"
 )
 
-func MakeImage(filename string, size image.Rectangle, pixels []*PixelEdit) {
-	img := image.NewRGBA(size)
-
-	for _, r := range pixels {
-		c, err := ParseHexColor(r.HexColor)
-		if err != nil {
-			log.Println(err)
-		}
-		img.Set(int(r.X), int(r.Y), c)
-	}
+func DrawSubregionToFile(img *image.RGBA, region image.Rectangle, filename string) error {
+	log.Println("Writing to", filename)
 	f, err := os.Create(filename)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
+	}
+
+	sub := img.SubImage(region)
+	if err = png.Encode(f, sub); err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+func DrawToFile(img *image.RGBA, filename string) error {
+	log.Println("Writing to", filename)
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
 	}
 	if err = png.Encode(f, img); err != nil {
-		log.Println(err)
+		return err
 	}
-	f.Close()
+	return f.Close()
 }
